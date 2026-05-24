@@ -1,13 +1,16 @@
-"""Example arc plugin.
+"""arc-plugin-gcs — Google Cloud Storage tools for arc agents.
 
-The package layout:
-  arc_plugin_example/
-    plugin.py             — the plugin class + the entry-point `build` function
-    tools/example_tool.py — one example tool
+Entry point:
+    arc.plugins.gcs = "arc_plugin_gcs.plugin:build"
 
-When you fork this template:
-  1. Rename the package directory (`src/arc_plugin_example/` → `src/arc_plugin_<yours>/`)
-  2. Update `pyproject.toml` (name, entry-point key, packages target)
-  3. Update imports in `plugin.py` and `tests/`
+Public surface:
+    GCSPlugin           — the plugin class (build() returns one)
+    build               — the entry-point callable
+
+Internal modules (not for out-of-tree consumption):
+    auth, client, rates, budget, escalation, formatters, tools/*
 """
+from arc_plugin_gcs.plugin import GCSPlugin, build
+
 __version__ = "0.1.0"
+__all__ = ["GCSPlugin", "build", "__version__"]

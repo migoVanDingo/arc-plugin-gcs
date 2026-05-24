@@ -3,20 +3,25 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "arc-plugin-example"
+name = "arc-plugin-gcs"
 version = "0.1.0"
-description = "Example arc plugin — fork this template to build your own."
+description = "Google Cloud Storage tools for arc agents — list, upload, download, signed URLs, cost/budget guards."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
 authors = [{ name = "Your Name", email = "you@example.com" }]
-keywords = ["arc", "agent", "plugin"]
+keywords = ["arc", "agent", "plugin", "gcs", "google-cloud-storage"]
 
 # arc itself is NOT a hard dependency — plugins import from `arc.plugin_api`,
 # which is provided by the host process at runtime. Declare it as a dev/test
 # dep only, so installing this package doesn't drag arc in for users who only
 # want to inspect or build the wheel.
-dependencies = []
+#
+# google-cloud-storage is the only runtime dep. It pulls in google-auth and
+# google-api-core transitively; that's expected.
+dependencies = [
+  "google-cloud-storage>=2.10",
+]
 
 [project.optional-dependencies]
 # `pip install -e ".[dev]"` for local development against a checked-out arc.
@@ -29,22 +34,13 @@ dev = [
 
 # ── Entry point ────────────────────────────────────────────────────────────
 # arc discovers plugins by walking the `arc.plugins` entry-point group.
-# Each entry point resolves to a *builder callable* with signature:
-#
-#   def build(config: dict, build_ctx) -> object
-#
-# `config` is the plugin's config block from arc's config.yml.
-# `build_ctx` is an arc.plugin_api.PluginBuildContext (bus, sessions_dir,
-# session_id, user_gate). Return any object that implements one or more hook
-# protocols and/or `provides_tools()`.
-#
-# The entry-point NAME is what appears in arc's config under `plugins.enabled`.
-# Rename it when you fork this template.
+# This plugin registers under the name `gcs` — that's what users put in their
+# config.yml under `plugins.enabled`.
 [project.entry-points."arc.plugins"]
-example = "arc_plugin_example.plugin:build"
+gcs = "arc_plugin_gcs.plugin:build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/arc_plugin_example"]
+packages = ["src/arc_plugin_gcs"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
