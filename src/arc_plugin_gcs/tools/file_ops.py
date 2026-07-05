@@ -20,6 +20,21 @@ except ImportError:  # pragma: no cover — tests run without arc installed
             return {"type": "object", "properties": self.properties,
                     "required": self.required}
 
+
+def _confine_download(download_dir: Path, requested: str) -> Path:
+    """Resolve `requested` UNDER download_dir. Rejects absolute paths and any
+    result that escapes the dir (via `..` or a symlink) — host-write safety."""
+    p = Path(requested)
+    if p.is_absolute():
+        raise ToolError(
+            "download local_path must be relative to the configured download "
+            "dir (absolute paths are not allowed)")
+    root = download_dir.resolve()
+    dest = (download_dir / p).resolve()
+    if dest != root and root not in dest.parents:
+        raise ToolError(f"download path escapes the download dir ({root})")
+    return dest
+
 from arc_plugin_gcs import rates
 from arc_plugin_gcs.tools import ToolContext
 from arc_plugin_gcs.tools._base import gate_and_reserve, human_bytes, to_tool_error
@@ -323,7 +338,8 @@ class GCSDownload:
                 },
                 "local_path": {
                     "type": "string",
-                    "description": "Destination on local disk (absolute or workspace-relative).",
+                    "description": "Destination filename, relative to the configured "
+                                   "download dir. Absolute paths and `..` are rejected.",
                 },
                 "overwrite": {
                     "type": "boolean",
@@ -338,7 +354,8 @@ class GCSDownload:
         local_path_str = str(input.get("local_path", "")).strip()
         if not local_path_str:
             raise ToolError("`local_path` is required and must be non-empty")
-        local = Path(local_path_str).expanduser()
+        # Confine the write to the configured download dir (host-write safety).
+        local = _confine_download(self._ctx.download_dir, local_path_str)
         try:
             parsed = self._ctx.client.parse_uri(
                 str(input.get("uri", "")), require_object=True
@@ -352,8 +369,7 @@ class GCSDownload:
                 f"would overwrite local file {local!s}; "
                 f"pass overwrite=true to confirm"
             )
-        if not local.parent.exists():
-            raise ToolError(f"parent directory does not exist: {local.parent}")
+        local.parent.mkdir(parents=True, exist_ok=True)  # create under download_dir
 
         try:
             blob = self._ctx.client.blob(parsed)
@@ -362,13 +378,13 @@ class GCSDownload:
         except Exception as exc:
             raise to_tool_error(exc, uri=parsed.gs_uri) from exc
 
-        operation = "download_overwrite" if local.exists() else "stat"
-        # The download itself is a separate op, but we treat the whole
-        # logical operation as one budget item.
+        # Every download is a host WRITE — a new file is `download_new` (a
+        # mutation), not `stat` (a read). This is what puts it through the gate.
+        operation = "download_overwrite" if local.exists() else "download_new"
         cost = rates.download_cost(size_bytes)
         gate_and_reserve(
             self._ctx,
-            operation=operation if local.exists() else "stat",
+            operation=operation,
             uri=parsed.gs_uri,
             bytes_transferred=cost.bytes_transferred,
             cost_usd=cost.cost_usd,

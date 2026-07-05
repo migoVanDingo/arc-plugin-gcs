@@ -13,6 +13,7 @@ into each tool.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from arc_plugin_gcs.budget import SessionBudget
@@ -27,6 +28,9 @@ class ToolContext:
     budget: SessionBudget
     escalation_level: EscalationLevel
     user_gate: Any                       # UserGate or NoOpGate
+    # gcs_download writes ONLY under this dir (host-write confinement); a
+    # requested local_path is resolved relative to it and may not escape.
+    download_dir: Path = Path.home() / ".arc" / "downloads"
     max_text_read_bytes: int = 1_048_576
     max_list_results: int = 1000
     max_signed_url_minutes: int = 1440

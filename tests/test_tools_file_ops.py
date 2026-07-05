@@ -159,13 +159,13 @@ def test_upload_local_file_missing(make_ctx, tmp_path):
 
 def test_download_happy_path(make_ctx, tmp_path, seed, bus):
     seed(bucket="my-bucket", key="src.bin", content=b"the-bytes")
-    dest = tmp_path / "downloaded.bin"
-    tool = GCSDownload(make_ctx())
-    out = tool.execute({
+    ctx = make_ctx()
+    ctx.download_dir = tmp_path
+    out = GCSDownload(ctx).execute({
         "uri": "gs://my-bucket/src.bin",
-        "local_path": str(dest),
+        "local_path": "downloaded.bin",   # relative to download_dir
     })
-    assert dest.read_bytes() == b"the-bytes"
+    assert (tmp_path / "downloaded.bin").read_bytes() == b"the-bytes"
     assert "downloaded" in out
     e = [e for e in bus.emitted if e.type == "gcs.download.completed"][0]
     assert e.payload["size_bytes"] == 9
@@ -173,28 +173,54 @@ def test_download_happy_path(make_ctx, tmp_path, seed, bus):
 
 def test_download_refuses_overwrite_by_default(make_ctx, tmp_path, seed):
     seed(bucket="my-bucket", key="x.bin", content=b"data")
-    dest = tmp_path / "exists.bin"
-    dest.write_bytes(b"OLD")
-    tool = GCSDownload(make_ctx())
+    (tmp_path / "exists.bin").write_bytes(b"OLD")
+    ctx = make_ctx()
+    ctx.download_dir = tmp_path
     with pytest.raises(ToolError, match="would overwrite"):
-        tool.execute({
+        GCSDownload(ctx).execute({
             "uri": "gs://my-bucket/x.bin",
-            "local_path": str(dest),
+            "local_path": "exists.bin",
         })
 
 
 def test_download_overwrite_with_gate(make_ctx, tmp_path, seed):
     seed(bucket="my-bucket", key="x.bin", content=b"new")
-    dest = tmp_path / "exists.bin"
-    dest.write_bytes(b"OLD")
-    tool = GCSDownload(make_ctx())
-    out = tool.execute({
+    (tmp_path / "exists.bin").write_bytes(b"OLD")
+    ctx = make_ctx()
+    ctx.download_dir = tmp_path
+    out = GCSDownload(ctx).execute({
         "uri": "gs://my-bucket/x.bin",
-        "local_path": str(dest),
+        "local_path": "exists.bin",
         "overwrite": True,
     })
-    assert dest.read_bytes() == b"new"
+    assert (tmp_path / "exists.bin").read_bytes() == b"new"
     assert "downloaded" in out
+
+
+def test_download_rejects_path_escape(make_ctx, tmp_path, seed):
+    """C6: absolute paths and `..` escapes are refused (host-write confinement)."""
+    seed(bucket="my-bucket", key="x.bin", content=b"data")
+    ctx = make_ctx()
+    ctx.download_dir = tmp_path / "dl"
+    # absolute paths and `..` escapes are rejected; a literal `~` is NOT expanded
+    # (it becomes a harmless subdir), so it's confined, not an escape.
+    for bad in ("/etc/passwd", "../escape.bin", "a/../../escape.bin"):
+        with pytest.raises(ToolError):
+            GCSDownload(ctx).execute({"uri": "gs://my-bucket/x.bin", "local_path": bad})
+
+
+def test_download_new_is_a_gated_write_op(make_ctx, tmp_path, seed, deny_gate):
+    """H10: a NEW-file download is a write (download_new) — a deny gate at the
+    mutations level blocks it (it used to be mis-classified as a read)."""
+    from arc_plugin_gcs.escalation import _MUTATION_OPS
+    assert "download_new" in _MUTATION_OPS
+    seed(bucket="my-bucket", key="x.bin", content=b"data")
+    ctx = make_ctx(gate=deny_gate)
+    ctx.download_dir = tmp_path
+    ctx.escalation_level = "mutations"
+    with pytest.raises(ToolError):
+        GCSDownload(ctx).execute({"uri": "gs://my-bucket/x.bin", "local_path": "new.bin"})
+    assert not (tmp_path / "new.bin").exists()
 
 
 # ── gcs_delete ──

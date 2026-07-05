@@ -10,6 +10,7 @@ provides_tools(). The session keeps running without GCS access.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 try:
@@ -62,6 +63,7 @@ class GCSPlugin:
         max_list_results: int,
         max_signed_url_minutes: int,
         user_gate: Any,
+        download_dir: Path = Path.home() / ".arc" / "downloads",
     ) -> None:
         self._allowed = list(allowed_buckets)
         self._default = default_bucket
@@ -72,6 +74,7 @@ class GCSPlugin:
         self._max_list_results = max_list_results
         self._max_signed_url_minutes = max_signed_url_minutes
         self._user_gate = user_gate
+        self._download_dir = download_dir
         self._bus: Any = None
         self._client: GCSClient | None = None
         self._tools: list[Any] = []
@@ -136,6 +139,7 @@ class GCSPlugin:
             max_text_read_bytes=self._max_text_read_bytes,
             max_list_results=self._max_list_results,
             max_signed_url_minutes=self._max_signed_url_minutes,
+            download_dir=self._download_dir,
             bus=self._bus,
         )
 
@@ -275,6 +279,16 @@ def build(config: dict, build_ctx: PluginBuildContext) -> GCSPlugin:
         # silently misbehave with bad config.
         raise
 
+    # Downloads are confined to this dir (host-write safety). Config overrides;
+    # default is <arc_home>/downloads, derived from the sessions dir.
+    dl_cfg = config.get("download_dir")
+    if dl_cfg:
+        download_dir = Path(str(dl_cfg)).expanduser()
+    else:
+        sessions_dir = getattr(build_ctx, "sessions_dir", None)
+        download_dir = (Path(sessions_dir).parent / "downloads") if sessions_dir \
+            else Path.home() / ".arc" / "downloads"
+
     plugin = GCSPlugin(
         allowed_buckets=allowed_buckets,
         default_bucket=default_bucket,
@@ -285,6 +299,7 @@ def build(config: dict, build_ctx: PluginBuildContext) -> GCSPlugin:
         max_list_results=max_list_results,
         max_signed_url_minutes=max_signed_url_minutes,
         user_gate=getattr(build_ctx, "user_gate", None),
+        download_dir=download_dir,
     )
     bus = getattr(build_ctx, "bus", None)
     if bus is not None:

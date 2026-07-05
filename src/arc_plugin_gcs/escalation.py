@@ -24,6 +24,7 @@ Operation = Literal[
     "download_overwrite",
     # mutations
     "upload_new",
+    "download_new",   # writes a new file to the host — a mutation, not a read
     "signed_url",
     # reads
     "list",
@@ -36,7 +37,7 @@ Operation = Literal[
 ]
 
 _DESTRUCTIVE_OPS = frozenset({"delete", "upload_overwrite", "download_overwrite"})
-_MUTATION_OPS = frozenset({"upload_new", "signed_url"})
+_MUTATION_OPS = frozenset({"upload_new", "download_new", "signed_url"})
 _READ_OPS = frozenset({"list", "stat", "read_text", "dirs", "recent",
                        "summarize_bucket", "estimate_storage_cost"})
 
