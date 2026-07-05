@@ -17,6 +17,19 @@ against `arc.plugin_api` v0.1.
 - **`v2/_design/0021-gcs-plugin.md`** (in the arc v2 tree) — the design
   doc this plugin implements. Authoritative for every decision.
 
+## ⚠️ Known security gaps (2026-07 audit — unfixed)
+
+Audit ref `agent-runtime/_code_review/02-security-audit.md` (C6/H10/M11). The
+bucket-allowlist chokepoint is solid, but the **host-write side is not confined**:
+- `gcs_download` writes to any `Path(local_path).expanduser()` — no root
+  confinement, `..`/absolute accepted → arbitrary host-file write
+  (`~/.ssh/authorized_keys`, LaunchAgents). Confine to a configured `download_dir`.
+- A **new-file** download is classified as operation `"stat"` (a read op) → it
+  bypasses the UserGate; only overwrites are gated. Treat every download as a
+  host-write op.
+- The session budget is inert unless `session_budget` is configured (defaults to
+  all-`None` caps). Ship conservative defaults or warn when uncapped.
+
 ## Code map
 
 ```
