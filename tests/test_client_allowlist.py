@@ -57,7 +57,7 @@ def test_parse_empty_bucket_raises(make_client):
 
 def test_disallowed_bucket_rejected_before_api(make_client):
     client = make_client(allowed_buckets=["my-bucket"])
-    with pytest.raises(GCSClientError, match="not in allowed_buckets"):
+    with pytest.raises(GCSClientError, match="not in the configured"):
         client.parse_uri("gs://other-bucket/foo.txt")
 
 
@@ -83,5 +83,5 @@ def test_require_object_rejects_bucket_root(make_client):
 
 def test_check_allowed_disallowed_raises(make_client):
     client = make_client(allowed_buckets=["foo"])
-    with pytest.raises(GCSClientError, match="not in allowed_buckets"):
+    with pytest.raises(GCSClientError, match="not in the configured"):
         client.check_allowed("bar")

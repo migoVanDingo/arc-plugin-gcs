@@ -122,12 +122,24 @@ class GCSPlugin:
             }, severity="warn")
             return
 
+        caps = self._budget_caps
+        budget_uncapped = (caps.max_api_calls is None
+                           and caps.max_bytes_transferred is None
+                           and caps.max_cost_usd is None)
         self._emit("gcs.client_ready", payload={
             "credential_source": auth.source,
             "allowed_buckets": list(self._allowed),
             "default_bucket": self._default,
             "escalation_level": self._escalation,
+            "budget_uncapped": budget_uncapped,
         })
+        if budget_uncapped:
+            # The advertised cost/quota guard is inert until `session_budget`
+            # is configured — say so loudly (M11).
+            self._emit("gcs.budget.uncapped", payload={
+                "reason": "no session_budget configured — GCS calls/bytes/cost "
+                          "are uncapped this session",
+            }, severity="warn")
 
         # Build the shared tool context.
         budget = SessionBudget(self._budget_caps)

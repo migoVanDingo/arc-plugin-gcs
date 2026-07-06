@@ -49,7 +49,7 @@ def test_list_empty_returns_sentinel(make_ctx, bus):
 
 def test_list_disallowed_bucket_rejected(make_ctx):
     tool = GCSList(make_ctx())
-    with pytest.raises(ToolError, match="not in allowed_buckets"):
+    with pytest.raises(ToolError, match="not in the configured"):
         tool.execute({"prefix": "gs://other-bucket/"})
 
 

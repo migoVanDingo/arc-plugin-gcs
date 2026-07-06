@@ -131,9 +131,9 @@ class GCSClient:
     def check_allowed(self, bucket: str) -> None:
         """Raise if `bucket` is not in the allowlist."""
         if bucket not in self._allowed:
+            # Don't echo the full allowlist to the model (infra disclosure).
             raise GCSClientError(
-                f"bucket {bucket!r} is not in allowed_buckets "
-                f"({sorted(self._allowed)})"
+                f"bucket {bucket!r} is not in the configured allowed_buckets"
             )
 
     def close(self) -> None:

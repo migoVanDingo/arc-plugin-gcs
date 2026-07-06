@@ -29,8 +29,11 @@ the host-write side is now confined too:
 - ✅ **Every download is a host WRITE op** — a new file is `download_new` (a
   mutation gated at the `mutations` level), not `stat`. It no longer bypasses the
   gate.
-- Still open (**M11**): the session budget is inert unless `session_budget` is
-  configured (all-`None` caps). Ship conservative defaults or warn when uncapped.
+- ⚠️ Partial (**M11**): the session budget is inert unless `session_budget` is
+  configured. `on_session_start` now **warns** when uncapped (`gcs.budget.uncapped`
+  event + `budget_uncapped` flag on `gcs.client_ready`); shipping conservative
+  default caps is still a policy call.
+- ✅ Allowlist-denial errors no longer echo the full bucket list to the model.
 
 ## Code map
 
